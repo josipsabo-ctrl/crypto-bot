@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 3000;
 
 // ===== AI SETUP =====
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || "missing",
 });
 
 // ===== ACCOUNT =====
