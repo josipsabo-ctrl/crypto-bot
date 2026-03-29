@@ -9,9 +9,9 @@ let btc = 0;
 
 async function getPrice() {
   const res = await axios.get(
-    "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+    "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
   );
-  return parseFloat(res.data.price);
+  return res.data.bitcoin.usd;
 }
 
 async function runBot() {
