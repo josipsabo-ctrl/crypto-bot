@@ -1,10 +1,9 @@
-import express from "express";
-import OpenAI from "openai";
+const express = require("express");
+const OpenAI = require("openai");
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// ✅ FIX: no node-fetch needed (Node 18+ has fetch)
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -12,12 +11,14 @@ const openai = new OpenAI({
 let balance = 100;
 let btc = 0;
 
-// ✅ GET BTC PRICE
+// ✅ GET BTC PRICE FROM COINGECKO
 async function getBTCPrice() {
   try {
-    const res = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT");
+    const res = await fetch(
+      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
+    );
     const data = await res.json();
-    return parseFloat(data.price);
+    return data.bitcoin.usd;
   } catch (err) {
     console.log("Price error:", err.message);
     return null;
@@ -36,7 +37,8 @@ async function getAIAdvice(price) {
       messages: [
         {
           role: "system",
-          content: "You are a crypto trading AI. Respond ONLY JSON like {\"action\":\"buy\",\"confidence\":80}"
+          content:
+            "You are a crypto trading AI. Respond ONLY JSON like {\"action\":\"buy\",\"confidence\":80}"
         },
         {
           role: "user",
@@ -83,7 +85,6 @@ app.get("/", async (req, res) => {
   });
 });
 
-// ✅ START SERVER
 app.listen(port, () => {
   console.log("Bot running on port", port);
 });
