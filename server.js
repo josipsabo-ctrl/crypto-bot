@@ -7,15 +7,26 @@ const PORT = process.env.PORT || 3000;
 let balance = 100;
 let btc = 0;
 
+// SAFE price fetch
 async function getPrice() {
-  const res = await axios.get(
-    "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
-  );
-  return res.data.bitcoin.usd;
+  try {
+    const res = await axios.get(
+      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
+    );
+    return res.data.bitcoin.usd;
+  } catch (err) {
+    console.log("Price error:", err.message);
+    return null;
+  }
 }
 
+// BOT LOGIC
 async function runBot() {
   const price = await getPrice();
+
+  if (!price) {
+    return { error: "Price unavailable" };
+  }
 
   if (price < 60000 && balance > 10) {
     const amount = balance * 0.1;
@@ -35,10 +46,19 @@ async function runBot() {
   };
 }
 
-setInterval(runBot, 15000);
+// LOOP (never crash)
+setInterval(async () => {
+  try {
+    await runBot();
+  } catch (e) {
+    console.log("Bot error:", e.message);
+  }
+}, 15000);
 
+// API
 app.get("/", async (req, res) => {
-  res.json(await runBot());
+  const data = await runBot();
+  res.json(data);
 });
 
 app.listen(PORT, () => console.log("Bot running"));
