@@ -6,29 +6,54 @@ const OpenAI = require("openai");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// AI setup
+// ===== AI SETUP =====
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// account
+// ===== ACCOUNT =====
 let balance = 100;
 let btc = 0;
 
-// get price history
+// ===== GET PRICE HISTORY (STABLE + FALLBACK) =====
 async function getHistory() {
   try {
     const res = await axios.get(
-      "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=7"
+      "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
+      {
+        params: {
+          vs_currency: "usd",
+          days: "1",
+        },
+        timeout: 5000,
+      }
     );
+
+    if (!res.data.prices) return [];
+
     return res.data.prices.map(p => p[1]);
+
   } catch (err) {
-    console.log("History error:", err.message);
-    return [];
+    console.log("Main API failed, using fallback...");
+
+    try {
+      const res = await axios.get(
+        "https://api.coindesk.com/v1/bpi/currentprice.json"
+      );
+
+      const price = res.data.bpi.USD.rate_float;
+
+      // fake history for RSI
+      return Array(50).fill(price);
+
+    } catch (err2) {
+      console.log("Fallback failed:", err2.message);
+      return [];
+    }
   }
 }
 
-// AI decision
+// ===== AI DECISION =====
 async function aiDecision(price, rsi) {
   try {
     const prompt = `
@@ -49,18 +74,19 @@ Return JSON:
     });
 
     return JSON.parse(res.choices[0].message.content);
+
   } catch (err) {
     console.log("AI error:", err.message);
     return { action: "hold", confidence: 0 };
   }
 }
 
-// main bot
+// ===== MAIN BOT =====
 async function runBot() {
   const prices = await getHistory();
 
   if (!prices || prices.length < 20) {
-    return { error: "Not enough data" };
+    return { error: "Waiting for data..." };
   }
 
   const price = prices[prices.length - 1];
@@ -78,7 +104,7 @@ async function runBot() {
 
   const ai = await aiDecision(price, rsi);
 
-  // trade only if strong confidence
+  // ===== TRADE LOGIC =====
   if (ai.confidence > 70) {
     if (ai.action === "buy" && balance > 10) {
       const amount = balance * 0.1;
@@ -102,7 +128,7 @@ async function runBot() {
   };
 }
 
-// loop
+// ===== LOOP (SAFE) =====
 setInterval(async () => {
   try {
     await runBot();
@@ -111,7 +137,7 @@ setInterval(async () => {
   }
 }, 20000);
 
-// API
+// ===== API =====
 app.get("/", async (req, res) => {
   const data = await runBot();
   res.json(data);
