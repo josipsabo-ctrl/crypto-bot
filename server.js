@@ -1,5 +1,5 @@
-const express = require("express");
-const OpenAI = require("openai");
+import express from "express";
+import OpenAI from "openai";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -11,7 +11,7 @@ const openai = new OpenAI({
 let balance = 100;
 let btc = 0;
 
-// ✅ GET BTC PRICE FROM COINGECKO
+// COINGECKO PRICE
 async function getBTCPrice() {
   try {
     const res = await fetch(
@@ -25,7 +25,7 @@ async function getBTCPrice() {
   }
 }
 
-// ✅ AI DECISION
+// AI
 async function getAIAdvice(price) {
   try {
     if (!process.env.OPENAI_API_KEY) {
@@ -37,8 +37,7 @@ async function getAIAdvice(price) {
       messages: [
         {
           role: "system",
-          content:
-            "You are a crypto trading AI. Respond ONLY JSON like {\"action\":\"buy\",\"confidence\":80}"
+          content: "Return ONLY JSON like {\"action\":\"buy\",\"confidence\":80}"
         },
         {
           role: "user",
@@ -47,8 +46,7 @@ async function getAIAdvice(price) {
       ]
     });
 
-    const text = response.choices[0].message.content;
-    return JSON.parse(text);
+    return JSON.parse(response.choices[0].message.content);
 
   } catch (err) {
     console.log("AI ERROR:", err.message);
@@ -56,7 +54,7 @@ async function getAIAdvice(price) {
   }
 }
 
-// ✅ ROUTE
+// ROUTE
 app.get("/", async (req, res) => {
   const price = await getBTCPrice();
 
