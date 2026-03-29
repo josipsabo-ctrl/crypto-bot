@@ -1,139 +1,85 @@
-const express = require("express");
-const axios = require("axios");
-const { RSI } = require("technicalindicators");
-const OpenAI = require("openai");
+import express from "express";
+import fetch from "node-fetch";
+import OpenAI from "openai";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 
-// ===== AI SETUP =====
+// ✅ INIT OPENAI
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "missing",
+  apiKey: process.env.OPENAI_API_KEY, // <-- THIS IS CRITICAL
 });
 
-// ===== ACCOUNT =====
 let balance = 100;
 let btc = 0;
 
-// ===== GET PRICE HISTORY (STABLE + FALLBACK) =====
-async function getHistory() {
+async function getBTCPrice() {
   try {
-    const res = await axios.get(
-      "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
-      {
-        params: {
-          vs_currency: "usd",
-          days: "1",
-        },
-      }
-    );
-
-    let prices = res.data.prices.map(p => p[1]);
-
-    // 🔥 FIX: if too short → fill it
-    if (prices.length < 50) {
-      const last = prices[prices.length - 1] || 65000;
-      prices = Array(50).fill(last);
-    }
-
-    return prices;
-
+    const res = await fetch("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT");
+    const data = await res.json();
+    return parseFloat(data.price);
   } catch (err) {
-    console.log("API failed, fallback...");
-
-    const fakePrice = 65000;
-    return Array(50).fill(fakePrice);
+    console.log("Price error:", err.message);
+    return null;
   }
 }
 
-// ===== AI DECISION =====
-async function aiDecision(price, rsi) {
+async function getAIAdvice(price) {
   try {
-    const prompt = `
-You are a professional crypto trader.
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("API KEY NOT FOUND");
+    }
 
-Price: ${price}
-RSI: ${rsi}
-
-Decide: buy, sell, or hold.
-
-Return JSON:
-{"action":"buy|sell|hold","confidence":0-100}
-`;
-
-    const res = await openai.chat.completions.create({
+    const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        {
+          role: "system",
+          content: "You are a crypto trading AI. Answer only JSON: {action: buy/sell/hold, confidence: 0-100}"
+        },
+        {
+          role: "user",
+          content: `BTC price is ${price}. What should I do?`
+        }
+      ],
     });
 
-    return JSON.parse(res.choices[0].message.content);
-
+    const text = response.choices[0].message.content;
+    return JSON.parse(text);
   } catch (err) {
-    console.log("AI error:", err.message);
+    console.log("AI ERROR:", err.message);
     return { action: "hold", confidence: 0 };
   }
 }
 
-// ===== MAIN BOT =====
-async function runBot() {
-  const prices = await getHistory();
+app.get("/", async (req, res) => {
+  const price = await getBTCPrice();
 
-  if (!prices || prices.length < 20) {
-    return { error: "Waiting for data..." };
+  if (!price) {
+    return res.json({ error: "Price unavailable" });
   }
 
-  const price = prices[prices.length - 1];
+  const ai = await getAIAdvice(price);
 
-  const rsiArr = RSI.calculate({
-    period: 14,
-    values: prices.slice(-50),
-  });
-
-  const rsi = rsiArr[rsiArr.length - 1];
-
-  if (!rsi) {
-    return { error: "RSI unavailable" };
+  if (ai.action === "buy" && balance > 0) {
+    btc = balance / price;
+    balance = 0;
   }
 
-  const ai = await aiDecision(price, rsi);
-
-  // ===== TRADE LOGIC =====
-  if (ai.confidence > 70) {
-    if (ai.action === "buy" && balance > 10) {
-      const amount = balance * 0.1;
-      btc += amount / price;
-      balance -= amount;
-    }
-
-    if (ai.action === "sell" && btc > 0) {
-      balance += btc * price;
-      btc = 0;
-    }
+  if (ai.action === "sell" && btc > 0) {
+    balance = btc * price;
+    btc = 0;
   }
 
-  return {
+  res.json({
     price,
-    rsi: rsi.toFixed(2),
     ai_action: ai.action,
     confidence: ai.confidence,
-    balance: balance.toFixed(2),
-    btc: btc.toFixed(6),
-  };
-}
-
-// ===== LOOP (SAFE) =====
-setInterval(async () => {
-  try {
-    await runBot();
-  } catch (err) {
-    console.log("Bot error:", err.message);
-  }
-}, 20000);
-
-// ===== API =====
-app.get("/", async (req, res) => {
-  const data = await runBot();
-  res.json(data);
+    balance,
+    btc,
+  });
 });
 
-app.listen(PORT, () => console.log("Bot running"));
+app.listen(port, () => {
+  console.log("Bot running on port", port);
+});
