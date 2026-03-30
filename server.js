@@ -11,10 +11,15 @@ async function getSolPrice() {
 
     const data = await res.json();
 
-    console.log("DEX RESPONSE:", data);
+    console.log("DEX RESPONSE:", data.pairs?.length);
 
-    // take first pair price
-    const price = data?.pairs?.[0]?.priceUsd;
+    // find best pair (USDC or USDT)
+    const pair = data.pairs.find(p =>
+      p.quoteToken.symbol === "USDC" ||
+      p.quoteToken.symbol === "USDT"
+    );
+
+    const price = pair?.priceUsd;
 
     return price ? Number(price) : 0;
 
