@@ -3,7 +3,7 @@ import express from "express";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ✅ Fetch SOL price
+// ================= SOL PRICE =================
 async function getSolPrice() {
   try {
     const res = await fetch(
@@ -11,15 +11,16 @@ async function getSolPrice() {
     );
     const data = await res.json();
 
-    const pair = data.pairs?.[0];
-    return pair?.priceUsd ? parseFloat(pair.priceUsd) : 0;
+    if (!data.pairs || data.pairs.length === 0) return 0;
+
+    return parseFloat(data.pairs[0].priceUsd);
   } catch (err) {
     console.log("SOL price error:", err.message);
     return 0;
   }
 }
 
-// ✅ Fetch MEMECOINS (WORKING FILTER)
+// ================= MEMECOINS =================
 async function getMemecoins() {
   try {
     const res = await fetch(
@@ -38,14 +39,14 @@ async function getMemecoins() {
         p.liquidity?.usd > 500 &&
         p.volume?.h24 > 100
       )
-      .sort((a, b) => b.volume.h24 - a.volume.h24)
+      .sort((a, b) => (b.volume?.h24 || 0) - (a.volume?.h24 || 0))
       .slice(0, 10)
       .map((p) => ({
         name: p.baseToken.name,
         symbol: p.baseToken.symbol,
-        price: parseFloat(p.priceUsd),
-        volume24h: p.volume.h24,
-        liquidity: p.liquidity.usd,
+        price: Number(p.priceUsd),
+        volume24h: p.volume?.h24 || 0,
+        liquidity: p.liquidity?.usd || 0,
       }));
 
     return coins;
@@ -55,5 +56,27 @@ async function getMemecoins() {
   }
 }
 
-// ✅ ROOT ROUTE (fixes "Cannot GET /")
-app.get("/", (req, res
+// ================= ROUTES =================
+
+// Root (fixes "Cannot GET /")
+app.get("/", (req, res) => {
+  res.send("🚀 Sniper bot is running!");
+});
+
+// Data endpoint
+app.get("/data", async (req, res) => {
+  const solPrice = await getSolPrice();
+  const memecoins = await getMemecoins();
+
+  res.json({
+    status: "Sniper bot running 🚀",
+    solanaPrice: solPrice,
+    memecoins: memecoins,
+    time: new Date().toISOString(),
+  });
+});
+
+// ================= START SERVER =================
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
