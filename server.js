@@ -21,51 +21,31 @@ async function getSolanaPrice() {
 async function getMemecoins() {
   try {
     const res = await fetch(
-      "https://api.dexscreener.com/latest/dex/search?q=solana"
+      "https://api.dexscreener.com/latest/dex/search?q=usd"
     );
 
-    const text = await res.text();
+    const data = await res.json();
 
-    if (text.startsWith("<")) {
-      console.log("❌ API returned HTML");
-      return [];
-    }
+    return data.pairs
+      ?.filter((p) =>
+        p.chainId === "solana" &&
+        p.baseToken.symbol !== "SOL" &&   // ❌ remove SOL
+        p.liquidity?.usd > 10000 &&       // 💧 real liquidity
+        p.volume?.h24 > 5000              // 🔥 active trading
+      )
+      .slice(0, 5)
+      .map((p) => ({
+        name: p.baseToken.name,
+        symbol: p.baseToken.symbol,
+        price: p.priceUsd,
+        volume24h: p.volume.h24,
+      })) || [];
 
-    const data = JSON.parse(text);
-
-    return (
-      data.pairs
-        ?.filter(
-          (p) =>
-            p.chainId === "solana" &&
-            p.liquidity?.usd > 5000 &&
-            p.volume?.h24 > 1000
-        )
-        .slice(0, 5)
-        .map((p) => ({
-          name: p.baseToken.name,
-          symbol: p.baseToken.symbol,
-          price: p.priceUsd,
-        })) || []
-    );
   } catch (err) {
     console.log("Memecoin error:", err);
     return [];
   }
 }
-
-// 🔹 API route
-app.get("/", async (req, res) => {
-  const solanaPrice = await getSolanaPrice();
-  const memecoins = await getMemecoins();
-
-  res.json({
-    status: "Sniper bot running 🚀",
-    solanaPrice,
-    memecoins,
-    time: new Date().toISOString(),
-  });
-});
 
 // 🔹 Start server
 app.listen(PORT, () => {
