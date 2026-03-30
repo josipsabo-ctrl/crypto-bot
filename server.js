@@ -4,23 +4,36 @@ const app = express();
 
 // ===== GET SOL PRICE =====
 async function getSolPrice() {
+async function getMemecoins() {
   try {
     const res = await fetch(
-      "https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112"
+      "https://api.dexscreener.com/latest/dex/search?q=solana"
     );
 
     const data = await res.json();
 
-    const pair = data.pairs.find(p =>
-      p.quoteToken.symbol === "USDC" ||
-      p.quoteToken.symbol === "USDT"
-    );
+    console.log("SEARCH RESULT:", data.pairs?.length);
 
-    return Number(pair?.priceUsd || 0);
+    const coins = data.pairs
+      .filter(p =>
+        p.chainId === "solana" &&
+        p.liquidity?.usd > 5000 &&
+        p.volume?.h24 > 1000
+      )
+      .slice(0, 5)
+      .map(p => ({
+        name: p.baseToken.name,
+        symbol: p.baseToken.symbol,
+        price: p.priceUsd,
+        volume24h: p.volume.h24,
+        liquidity: p.liquidity.usd
+      }));
+
+    return coins;
 
   } catch (err) {
-    console.log("SOL error:", err);
-    return 0;
+    console.log("Memecoin error:", err);
+    return [];
   }
 }
 
