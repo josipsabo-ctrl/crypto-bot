@@ -3,13 +3,21 @@ import express from "express";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ✅ SOL price (fixed)
+// ✅ FIXED SOL PRICE (with headers)
 async function getSolanaPrice() {
   try {
     const res = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
+      "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd",
+      {
+        headers: {
+          "accept": "application/json",
+        },
+      }
     );
+
     const data = await res.json();
+
+    console.log("SOL RAW:", data); // DEBUG
 
     return data?.solana?.usd || 0;
   } catch (err) {
@@ -18,20 +26,26 @@ async function getSolanaPrice() {
   }
 }
 
-// ✅ REAL memecoin filter
+// ✅ FIXED MEMECOINS (proper headers + validation)
 async function getMemecoins() {
   try {
     const res = await fetch(
-      "https://api.dexscreener.com/latest/dex/search?q=SOL"
+      "https://api.dexscreener.com/latest/dex/search?q=solana",
+      {
+        headers: {
+          "accept": "application/json",
+        },
+      }
     );
 
-    const data = await res.json();
+    const text = await res.text(); // 🔥 IMPORTANT
+    const data = JSON.parse(text);
+
+    console.log("DEX RAW OK");
 
     return data.pairs
       ?.filter((p) =>
         p.chainId === "solana" &&
-        p.baseToken.symbol !== "SOL" &&
-        p.baseToken.symbol.length < 10 && // avoid spam tokens
         p.liquidity?.usd > 20000 &&
         p.volume?.h24 > 10000
       )
