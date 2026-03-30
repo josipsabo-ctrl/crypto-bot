@@ -3,49 +3,36 @@ import express from "express";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ✅ FIXED SOL PRICE (with headers)
-async function getSolanaPrice() {
+// 🔥 GET DATA FROM DEXSCREENER (SOL + MEMECOINS)
+async function getMarketData() {
   try {
     const res = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd",
+      "https://api.dexscreener.com/latest/dex/search?q=SOL",
       {
         headers: {
-          "accept": "application/json",
+          accept: "application/json",
         },
       }
     );
 
     const data = await res.json();
 
-    console.log("SOL RAW:", data); // DEBUG
+    if (!data.pairs) return { solPrice: 0, memecoins: [] };
 
-    return data?.solana?.usd || 0;
-  } catch (err) {
-    console.log("Solana error:", err);
-    return 0;
-  }
-}
-
-// ✅ FIXED MEMECOINS (proper headers + validation)
-async function getMemecoins() {
-  try {
-    const res = await fetch(
-      "https://api.dexscreener.com/latest/dex/search?q=solana",
-      {
-        headers: {
-          "accept": "application/json",
-        },
-      }
+    // ✅ SOL PRICE (from first strong pair)
+    const solPair = data.pairs.find(
+      (p) =>
+        p.baseToken.symbol === "SOL" &&
+        p.quoteToken.symbol === "USDC"
     );
 
-    const text = await res.text(); // 🔥 IMPORTANT
-    const data = JSON.parse(text);
+    const solPrice = solPair?.priceUsd || 0;
 
-    console.log("DEX RAW OK");
-
-    return data.pairs
-      ?.filter((p) =>
+    // ✅ REAL MEMECOINS FILTER
+    const memecoins = data.pairs
+      .filter((p) =>
         p.chainId === "solana" &&
+        p.baseToken.symbol !== "SOL" && // ❌ remove SOL
         p.liquidity?.usd > 20000 &&
         p.volume?.h24 > 10000
       )
@@ -56,22 +43,23 @@ async function getMemecoins() {
         price: p.priceUsd,
         volume24h: p.volume.h24,
         liquidity: p.liquidity.usd,
-      })) || [];
+      }));
+
+    return { solPrice, memecoins };
 
   } catch (err) {
-    console.log("Memecoin error:", err);
-    return [];
+    console.log("Market error:", err);
+    return { solPrice: 0, memecoins: [] };
   }
 }
 
 // ✅ ROUTE
 app.get("/", async (req, res) => {
-  const solanaPrice = await getSolanaPrice();
-  const memecoins = await getMemecoins();
+  const { solPrice, memecoins } = await getMarketData();
 
   res.json({
     status: "Sniper bot running 🚀",
-    solanaPrice,
+    solanaPrice: solPrice,
     memecoins,
     time: new Date().toISOString(),
   });
