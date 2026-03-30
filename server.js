@@ -3,45 +3,37 @@ import express from "express";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ✅ GET SOLANA PRICE (Coingecko)
+// 🔹 Solana price
 async function getSolanaPrice() {
   try {
     const res = await fetch(
       "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
     );
-
     const data = await res.json();
-
     return data.solana?.usd || 0;
   } catch (err) {
-    console.log("Solana price error:", err);
+    console.log("Solana error:", err);
     return 0;
   }
 }
 
-// ✅ GET MEMECOINS FROM DEXSCREENER
+// 🔹 Memecoins
 async function getMemecoins() {
   try {
-    const url =
-      "https://api.dexscreener.com/latest/dex/search?q=solana";
-
-    const res = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-      },
-    });
+    const res = await fetch(
+      "https://api.dexscreener.com/latest/dex/search?q=solana"
+    );
 
     const text = await res.text();
 
-    // ❌ If API returns HTML instead of JSON
     if (text.startsWith("<")) {
-      console.log("❌ Dexscreener returned HTML");
+      console.log("❌ API returned HTML");
       return [];
     }
 
     const data = JSON.parse(text);
 
-    const coins =
+    return (
       data.pairs
         ?.filter(
           (p) =>
@@ -54,18 +46,15 @@ async function getMemecoins() {
           name: p.baseToken.name,
           symbol: p.baseToken.symbol,
           price: p.priceUsd,
-          volume24h: p.volume.h24,
-          liquidity: p.liquidity.usd,
-        })) || [];
-
-    return coins;
+        })) || []
+    );
   } catch (err) {
     console.log("Memecoin error:", err);
     return [];
   }
 }
 
-// ✅ MAIN ROUTE
+// 🔹 API route
 app.get("/", async (req, res) => {
   const solanaPrice = await getSolanaPrice();
   const memecoins = await getMemecoins();
@@ -74,3 +63,11 @@ app.get("/", async (req, res) => {
     status: "Sniper bot running 🚀",
     solanaPrice,
     memecoins,
+    time: new Date().toISOString(),
+  });
+});
+
+// 🔹 Start server
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
