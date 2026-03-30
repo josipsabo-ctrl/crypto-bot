@@ -3,19 +3,30 @@ import express from "express";
 const app = express();
 
 // ===== GET SOL PRICE =====
-async function getSolPrice() {
 async function getMemecoins() {
   try {
-    const res = await fetch(
-      "https://api.dexscreener.com/latest/dex/search?q=solana"
-    );
+    const url = "https://api.dexscreener.com/latest/dex/search?q=solana";
 
-    const data = await res.json();
+    const res = await fetch(url, {
+      headers: {
+        "Accept": "application/json"
+      }
+    });
 
-    console.log("SEARCH RESULT:", data.pairs?.length);
+    // 🔍 DEBUG: check response type
+    const text = await res.text();
+
+    // ❗ If HTML → log it
+    if (text.startsWith("<")) {
+      console.log("❌ Got HTML instead of JSON:");
+      console.log(text.slice(0, 200));
+      return [];
+    }
+
+    const data = JSON.parse(text);
 
     const coins = data.pairs
-      .filter(p =>
+      ?.filter(p =>
         p.chainId === "solana" &&
         p.liquidity?.usd > 5000 &&
         p.volume?.h24 > 1000
@@ -27,7 +38,7 @@ async function getMemecoins() {
         price: p.priceUsd,
         volume24h: p.volume.h24,
         liquidity: p.liquidity.usd
-      }));
+      })) || [];
 
     return coins;
 
