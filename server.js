@@ -3,7 +3,7 @@ import express from "express";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ✅ GET DATA
+// ✅ MAIN FUNCTION
 async function getMarketData() {
   try {
     const res = await fetch(
@@ -45,7 +45,6 @@ async function getMarketData() {
         liquidity: p.liquidity.usd,
       }));
 
-    // ✅ RETURN INSIDE FUNCTION (IMPORTANT)
     return { solPrice, memecoins };
 
   } catch (err) {
@@ -62,4 +61,16 @@ app.get("/", async (req, res) => {
     status: "Sniper bot running 🚀",
     solanaPrice: solPrice,
     memecoins,
-    time: new Date().
+    time: new Date().toISOString(),
+  });
+});
+
+// ✅ HEALTH CHECK
+app.get("/health", (req, res) => {
+  res.send("OK");
+});
+
+// ✅ START SERVER
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
