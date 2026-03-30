@@ -3,7 +3,7 @@ import express from "express";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 🔹 Solana price
+// ✅ Get SOL price
 async function getSolanaPrice() {
   try {
     const res = await fetch(
@@ -17,21 +17,30 @@ async function getSolanaPrice() {
   }
 }
 
-// 🔹 Memecoins
+// ✅ Get memecoins (filtered, no SOL)
 async function getMemecoins() {
   try {
     const res = await fetch(
       "https://api.dexscreener.com/latest/dex/search?q=usd"
     );
 
-    const data = await res.json();
+    const text = await res.text();
+
+    // ❌ avoid HTML crash
+    if (text.startsWith("<")) {
+      console.log("Dexscreener returned HTML");
+      return [];
+    }
+
+    const data = JSON.parse(text);
 
     return data.pairs
-      ?.filter((p) =>
-        p.chainId === "solana" &&
-        p.baseToken.symbol !== "SOL" &&   // ❌ remove SOL
-        p.liquidity?.usd > 10000 &&       // 💧 real liquidity
-        p.volume?.h24 > 5000              // 🔥 active trading
+      ?.filter(
+        (p) =>
+          p.chainId === "solana" &&
+          p.baseToken.symbol !== "SOL" &&
+          p.liquidity?.usd > 10000 &&
+          p.volume?.h24 > 5000
       )
       .slice(0, 5)
       .map((p) => ({
@@ -39,15 +48,28 @@ async function getMemecoins() {
         symbol: p.baseToken.symbol,
         price: p.priceUsd,
         volume24h: p.volume.h24,
+        liquidity: p.liquidity.usd,
       })) || [];
-
   } catch (err) {
     console.log("Memecoin error:", err);
     return [];
   }
 }
 
-// 🔹 Start server
+// ✅ ROOT ROUTE (IMPORTANT)
+app.get("/", async (req, res) => {
+  const solanaPrice = await getSolanaPrice();
+  const memecoins = await getMemecoins();
+
+  res.json({
+    status: "Sniper bot running 🚀",
+    solanaPrice,
+    memecoins,
+    time: new Date().toISOString(),
+  });
+});
+
+// ✅ START SERVER
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
