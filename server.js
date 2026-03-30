@@ -2,7 +2,7 @@ import express from "express";
 
 const app = express();
 
-// ===== GET SOLANA PRICE FROM DEXSCREENER =====
+// ===== GET SOL PRICE =====
 async function getSolPrice() {
   try {
     const res = await fetch(
@@ -11,31 +11,63 @@ async function getSolPrice() {
 
     const data = await res.json();
 
-    console.log("DEX RESPONSE:", data.pairs?.length);
-
-    // find best pair (USDC or USDT)
     const pair = data.pairs.find(p =>
       p.quoteToken.symbol === "USDC" ||
       p.quoteToken.symbol === "USDT"
     );
 
-    const price = pair?.priceUsd;
-
-    return price ? Number(price) : 0;
+    return Number(pair?.priceUsd || 0);
 
   } catch (err) {
-    console.log("Error fetching SOL price:", err);
+    console.log("SOL error:", err);
     return 0;
+  }
+}
+
+// ===== GET TRENDING MEMECOINS =====
+async function getMemecoins() {
+  try {
+    const res = await fetch(
+      "https://api.dexscreener.com/latest/dex/pairs/solana"
+    );
+
+    const data = await res.json();
+
+    // filter strong tokens
+    const coins = data.pairs
+      .filter(p =>
+        p.liquidity?.usd > 10000 &&     // liquidity filter
+        p.volume?.h24 > 5000 &&         // volume filter
+        p.priceUsd &&
+        p.baseToken?.name
+      )
+      .slice(0, 5) // top 5
+
+      .map(p => ({
+        name: p.baseToken.name,
+        symbol: p.baseToken.symbol,
+        price: p.priceUsd,
+        volume24h: p.volume.h24,
+        liquidity: p.liquidity.usd
+      }));
+
+    return coins;
+
+  } catch (err) {
+    console.log("Memecoin error:", err);
+    return [];
   }
 }
 
 // ===== MAIN ROUTE =====
 app.get("/", async (req, res) => {
-  const price = await getSolPrice();
+  const solPrice = await getSolPrice();
+  const coins = await getMemecoins();
 
   res.json({
-    status: "Bot running 🚀",
-    solanaPrice: price,
+    status: "Sniper bot running 🚀",
+    solanaPrice: solPrice,
+    memecoins: coins,
     time: new Date()
   });
 });
