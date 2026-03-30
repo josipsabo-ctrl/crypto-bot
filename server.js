@@ -2,37 +2,31 @@ import express from "express";
 
 const app = express();
 
-// ===== GET SOLANA PRICE FROM COINGECKO =====
-async function getPrice() {
+// ===== GET SOLANA PRICE FROM DEXSCREENER =====
+async function getSolPrice() {
   try {
     const res = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd",
-      {
-        headers: {
-          "User-Agent": "Mozilla/5.0"
-        }
-      }
+      "https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112"
     );
 
     const data = await res.json();
 
-    console.log("API RESPONSE:", data);
+    console.log("DEX RESPONSE:", data);
 
-    if (data.solana && data.solana.usd) {
-      return data.solana.usd;
-    } else {
-      return 0;
-    }
+    // take first pair price
+    const price = data?.pairs?.[0]?.priceUsd;
+
+    return price ? Number(price) : 0;
 
   } catch (err) {
-    console.log("Error fetching price:", err);
+    console.log("Error fetching SOL price:", err);
     return 0;
   }
 }
 
 // ===== MAIN ROUTE =====
 app.get("/", async (req, res) => {
-  const price = await getPrice();
+  const price = await getSolPrice();
 
   res.json({
     status: "Bot running 🚀",
