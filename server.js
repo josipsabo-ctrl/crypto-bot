@@ -1,18 +1,17 @@
 import express from "express";
+import fetch from "node-fetch";
 import OpenAI from "openai";
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 10000;
 
+// OpenAI
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-let balance = 100;
-let btc = 0;
-
-// COINGECKO PRICE
-async function getBTCPrice() {
+// Get BTC price from CoinGecko
+async function getPrice() {
   try {
     const res = await fetch(
       "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
@@ -20,69 +19,49 @@ async function getBTCPrice() {
     const data = await res.json();
     return data.bitcoin.usd;
   } catch (err) {
-    console.log("Price error:", err.message);
     return null;
   }
 }
 
-// AI
-async function getAIAdvice(price) {
+// AI decision
+async function getAI(price) {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error("Missing API key");
-    }
-
-    const response = await openai.chat.completions.create({
+    const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
-          role: "system",
-          content: "Return ONLY JSON like {\"action\":\"buy\",\"confidence\":80}"
-        },
-        {
           role: "user",
-          content: `BTC price is ${price}`
-        }
-      ]
+          content: `Bitcoin price is ${price}. Should I buy, sell or hold? Answer short.`,
+        },
+      ],
     });
 
-    return JSON.parse(response.choices[0].message.content);
-
+    return completion.choices[0].message.content;
   } catch (err) {
-    console.log("AI ERROR:", err.message);
-    return { action: "hold", confidence: 0 };
+    console.log("AI error:", err.message);
+    return "AI error";
   }
 }
 
-// ROUTE
+// API route
 app.get("/", async (req, res) => {
-  const price = await getBTCPrice();
+  const price = await getPrice();
 
   if (!price) {
     return res.json({ error: "Price unavailable" });
   }
 
-  const ai = await getAIAdvice(price);
-
-  if (ai.action === "buy" && balance > 0) {
-    btc = balance / price;
-    balance = 0;
-  }
-
-  if (ai.action === "sell" && btc > 0) {
-    balance = btc * price;
-    btc = 0;
-  }
+  const ai = await getAI(price);
 
   res.json({
     price,
-    ai_action: ai.action,
-    confidence: ai.confidence,
-    balance,
-    btc
+    ai_action: ai,
+    balance: "100.00",
+    btc: "0.000000",
   });
 });
 
+// Start server
 app.listen(port, () => {
-  console.log("Bot running on port", port);
+  console.log("Bot running on port " + port);
 });
